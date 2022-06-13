@@ -1,9 +1,14 @@
-let work_binding _bind = ()
+open Parsetree
+
+let work_binding (bind : value_binding) =
+  Format.printf "pattern : %a\n" Pprintast.pattern bind.pvb_pat;
+  Format.printf "expression : %a\n" Pprintast.expression bind.pvb_expr
+
+let cpt = ref 0
 
 let work_struct str =
-  let open Parsetree in
   match str.pstr_desc with
-  | Pstr_value (_rec_flag, bindings) -> List.iter work_binding bindings
+  | Pstr_value (_rec_flag, bindings) -> cpt := !cpt + 1; List.iter work_binding bindings
   | _ -> ()
 
 let work structure =
@@ -21,4 +26,5 @@ let () =
       Format.printf "Parsing file: %s\n" filename;
       let structure = Pparse.parse_implementation ~tool_name:"" filename in
       Format.printf "@.%a\n\n" Pprintast.structure structure;
-      work structure
+      work structure;
+      Format.printf "number of pstr_value : %i\n" !cpt
