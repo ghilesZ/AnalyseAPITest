@@ -18,3 +18,8 @@ dune exec ./main.exe
 ````
 
 Note the *.exe* !
+
+How to get the parsetree of an OCaml program
+````sh
+ocamlc -dparsetree a.ml
+````
