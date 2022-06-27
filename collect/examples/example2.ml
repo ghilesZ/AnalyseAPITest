@@ -1,0 +1,1 @@
+let is_even x = x mod 2 = 0
