@@ -1,11 +1,13 @@
 open Parsetree
 
-let rec _list_of_expr list = match list with 
+(** Transforme la liste de labels et expression en list d'expression seulement
+du genre: [(l1, E1) ; ... ; (ln, En)] en [E1 ; ... ; En]*)
+let rec list_of_expr list = match list with 
     | [] -> []
-    | (_l,e) :: tail -> e :: _list_of_expr tail
+    | (l,e) :: tail -> e :: list_of_expr tail
 
 
-(* Trouver les constantes dans expression et les met dans un tableau *)
+(* Trouver les constantes dans expression de value_binding et les met dans un tableau *)
 let rec work_expr expression  =
     match expression.pexp_desc with
     | Pexp_constant (constant) -> [constant] 
@@ -13,8 +15,16 @@ let rec work_expr expression  =
        let list2 = work_expr expr2 in
        (match option with 
        |None -> list1 @ list2
-       |Some(e) -> list1@list2@ work_expr e )  
-    
+       |Some(e) -> list1@list2@ work_expr e ) 
+    |Pexp_fun (_, option, _, expr) -> let list1 = work_expr expr in
+        (match option with 
+        |None -> list1
+        |Some(e) -> work_expr e @ list1) 
+    | Pexp_apply (expr1, list) -> let list1 = work_expr expr1 in 
+        let list2 = list_of_expr list in 
+        list1 @ List.iter work_expr list2
+    | Pexp_let (_, list, expr) -> let list1 = List.iter work_expr (list_of_expr list) in
+        list1 @ work_expr expr
     | _ -> invalid_arg "Pas encore implémenté"
     
 
