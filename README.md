@@ -23,3 +23,14 @@ How to get the parsetree of an OCaml program
 ````sh
 ocamlc -dparsetree a.ml
 ````
+
+Installing OCamlFormat using opam: 
+````sh
+opam install ocaml-lsp-server
+opam install ocamlformat
+````
+
+How to get merlin using opam : 
+````sh
+opam install merlin
+````

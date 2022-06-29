@@ -27,6 +27,9 @@ let rec collect_constant expression : constant list =
       let expressions = List.map (fun vb -> vb.pvb_expr) list in
       let constant_expr = List.map collect_constant expressions in
       List.flatten constant_expr @ collect_constant body
+  | Pexp_tuple list -> List.flatten (List.map collect_constant list)
+  | Pexp_sequence (expression1, expression2) ->
+      collect_constant expression1 @ collect_constant expression2
   | _ ->
       (* Format.kasprintf invalid_arg "%a: pas encore implémenté"
          Pprintast.expression expression*)
@@ -37,6 +40,7 @@ let rec collect_constant expression : constant list =
 let rec collect_fun_calls expression : Longident.t list =
   match expression.pexp_desc with
   | Pexp_constant _ -> []
+  | Pexp_ident _ -> []
   | Pexp_ifthenelse (expr1, expr2, option) -> (
       let list1 = collect_fun_calls expr1 in
       let list2 = collect_fun_calls expr2 in
@@ -57,6 +61,9 @@ let rec collect_fun_calls expression : Longident.t list =
       let expressions = List.map (fun vb -> vb.pvb_expr) list in
       let constant_expr = List.map collect_fun_calls expressions in
       List.flatten constant_expr @ collect_fun_calls body
+  | Pexp_tuple list -> List.flatten (List.map collect_fun_calls list)
+  | Pexp_sequence (expr1, expr2) ->
+      collect_fun_calls expr1 @ collect_fun_calls expr2
   | _ -> invalid_arg "Pas encore implémenté"
 
 let _ = ignore collect_fun_calls
@@ -67,9 +74,13 @@ let work_binding (bind : value_binding) =
   let list_constant = collect_constant bind.pvb_expr in
   List.iter
     (fun c ->
-      Format.printf "constantes : %a\n" Pprintast.expression
+      Format.printf "constant : %a\n" Pprintast.expression
         (Ast_helper.Exp.constant c))
-    list_constant
+    list_constant;
+  let list_fun_call = collect_fun_calls bind.pvb_expr in
+  List.iter
+    (fun f -> Format.printf "fun_call : %a\n" Pprintast.longident f)
+    list_fun_call
 
 let work_struct str =
   match str.pstr_desc with
