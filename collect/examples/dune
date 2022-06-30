@@ -1,4 +1,5 @@
 (executable
- (name a)
+ (public_name collect)
+ (name main)
  (promote (until-clean))
  (libraries ocaml-migrate-parsetree collect))
