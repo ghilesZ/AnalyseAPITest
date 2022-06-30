@@ -24,6 +24,20 @@ How to get the parsetree of an OCaml program
 ocamlc -dparsetree a.ml
 ````
 
+## Requirements
+
+*dune* build system: 
+````sh
+opam install dune
+````
+
+Library for conversion between parsetrees of different OCaml versions.
+````sh
+opam install ocaml-migrate-parsetree
+````
+
+## Editors
+
 Installing OCamlFormat using opam: 
 ````sh
 opam install ocaml-lsp-server
