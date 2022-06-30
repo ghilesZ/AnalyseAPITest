@@ -1,9 +1,24 @@
 open Parsetree
 
-(** Transforme la liste de labels et expression en list d'expression seulement
+(** Transforme la liste de labels et expression en liste d'expression seulement
 du genre: [(l1, E1) ; ... ; (ln, En)] en [E1 ; ... ; En]*)
-let rec list_of_expr list =
+let rec list_of_expr list : expression list =
   match list with [] -> [] | (_, e) :: tail -> e :: list_of_expr tail
+
+(*Transforme la "case list" en liste d'expression seulement (partie option)*)
+let rec case_option list : expression list =
+  match list with
+  | [] -> []
+  | case :: tail -> (
+      match case.pc_guard with
+      | None -> case_option tail
+      | Some e -> e :: case_option tail)
+
+(*Transforme la "case list" en liste d'expression seulement*)
+let rec case_expression list : expression list =
+  match list with
+  | [] -> []
+  | case :: tail -> case.pc_rhs :: case_expression tail
 
 (* Trouver les constantes dans expression de value_binding et les met dans un tableau *)
 let rec collect_constant expression : constant list =
@@ -30,6 +45,20 @@ let rec collect_constant expression : constant list =
   | Pexp_tuple list -> List.flatten (List.map collect_constant list)
   | Pexp_sequence (expression1, expression2) ->
       collect_constant expression1 @ collect_constant expression2
+  | Pexp_try (expression, cases) ->
+      let list1 = collect_constant expression in
+      let list2 = case_option cases in
+      let list3 = case_expression cases in
+      list1
+      @ List.flatten (List.map collect_constant list2)
+      @ List.flatten (List.map collect_constant list3)
+  | Pexp_match (expression, cases) ->
+      let list1 = collect_constant expression in
+      let list2 = case_option cases in
+      let list3 = case_expression cases in
+      list1
+      @ List.flatten (List.map collect_constant list2)
+      @ List.flatten (List.map collect_constant list3)
   | _ ->
       (* Format.kasprintf invalid_arg "%a: pas encore implémenté"
          Pprintast.expression expression*)
@@ -64,9 +93,29 @@ let rec collect_fun_calls expression : Longident.t list =
   | Pexp_tuple list -> List.flatten (List.map collect_fun_calls list)
   | Pexp_sequence (expr1, expr2) ->
       collect_fun_calls expr1 @ collect_fun_calls expr2
+  | Pexp_try (expression, cases) ->
+      let list1 = collect_fun_calls expression in
+      let list2 = case_option cases in
+      let list3 = case_expression cases in
+      list1
+      @ List.flatten (List.map collect_fun_calls list2)
+      @ List.flatten (List.map collect_fun_calls list3)
+  | Pexp_match (expression, cases) ->
+      let list1 = collect_fun_calls expression in
+      let list2 = case_option cases in
+      let list3 = case_expression cases in
+      list1
+      @ List.flatten (List.map collect_fun_calls list2)
+      @ List.flatten (List.map collect_fun_calls list3)
   | _ -> invalid_arg "Pas encore implémenté"
 
 let _ = ignore collect_fun_calls
+
+(* Return true if raises exception else false*)
+let _fun_raise_excepion list : bool =
+  List.exists
+    (fun lid -> lid = "raise")
+    (List.flatten (List.map Longident.flatten list))
 
 let work_binding (bind : value_binding) =
   Format.printf "pattern : %a\n" Pprintast.pattern bind.pvb_pat;
@@ -81,6 +130,7 @@ let work_binding (bind : value_binding) =
   List.iter
     (fun f -> Format.printf "fun_call : %a\n" Pprintast.longident f)
     list_fun_call
+ (* Format.printf "raise : %b\n" fun_raise_excepion list_fun_call*)
 
 let work_struct str =
   match str.pstr_desc with
