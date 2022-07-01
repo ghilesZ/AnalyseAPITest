@@ -59,6 +59,8 @@ let rec collect_constant expression : constant list =
       list1
       @ List.flatten (List.map collect_constant list2)
       @ List.flatten (List.map collect_constant list3)
+  | Pexp_construct (_, exp) ->
+      List.flatten (List.map collect_constant (Option.to_list exp))
   | _ ->
       (* Format.kasprintf invalid_arg "%a: pas encore implémenté"
          Pprintast.expression expression*)
@@ -107,12 +109,12 @@ let rec collect_fun_calls expression : Longident.t list =
       list1
       @ List.flatten (List.map collect_fun_calls list2)
       @ List.flatten (List.map collect_fun_calls list3)
+  | Pexp_construct (_, exp) ->
+      List.flatten (List.map collect_fun_calls (Option.to_list exp))
   | _ -> invalid_arg "Pas encore implémenté"
 
-let _ = ignore collect_fun_calls
-
 (* Return true if raises exception else false*)
-let _fun_raise_excepion list : bool =
+let fun_raise_exception list : bool =
   List.exists
     (fun lid -> lid = "raise")
     (List.flatten (List.map Longident.flatten list))
@@ -129,15 +131,15 @@ let work_binding (bind : value_binding) =
   let list_fun_call = collect_fun_calls bind.pvb_expr in
   List.iter
     (fun f -> Format.printf "fun_call : %a\n" Pprintast.longident f)
-    list_fun_call
- (* Format.printf "raise : %b\n" fun_raise_excepion list_fun_call*)
+    list_fun_call;
+  Format.printf "raise : %b@." (fun_raise_exception list_fun_call)
 
 let work_struct str =
   match str.pstr_desc with
   | Pstr_value (_rec_flag, bindings) ->
       List.iter work_binding bindings (*a modifier *)
   | _ -> ()
-
+open Lexing
 let work structure =
   Format.printf "number of structures: %i\n%!" (List.length structure);
   List.iter work_struct structure
