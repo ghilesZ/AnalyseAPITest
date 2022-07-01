@@ -3,7 +3,7 @@
  (name collect)
  (modules Diff Collector)
  (wrapped false)
- (libraries ocaml-migrate-parsetree)
+ (libraries ocaml-migrate-parsetree unix)
 )
 
 (executable

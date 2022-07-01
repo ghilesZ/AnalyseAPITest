@@ -1,7 +1,7 @@
 (* Small wrapper around system commands *)
 
 (* exec a command and ignores its return status *)
-let exec cmd = ignore (Sys.command cmd)
+let exec cmd = Unix.open_process_in cmd
 
 (* launches a command with a list of arguments *)
 let run ?(opt = []) cmd args =
@@ -14,16 +14,21 @@ let lines_from_files filename =
   let rec lines_from_files_aux i acc =
     match input_line i with
     | s -> lines_from_files_aux i (s :: acc)
-    | exception End_of_file -> close_in ch_in ; List.rev acc
+    | exception End_of_file ->
+        close_in ch_in;
+        List.rev acc
   in
   lines_from_files_aux ch_in []
 
 (* launches a command with a list of arguments and gets its output *)
 let run_output ?opt cmd args =
-  let tmp_file = Filename.temp_file "" ".txt" in
-  run ?opt cmd (args @ [ ">" ^ tmp_file ]);
-  let s = lines_from_files tmp_file in 
-  s
+  let ic = run ?opt cmd args in
+  let rec loop acc =
+    match input_line ic with
+    | s -> loop (s :: acc)
+    | exception End_of_file -> acc
+  in
+  List.rev (loop [])
 
 (* calls diff on the given filename and gets the output*)
 let diff filename =
