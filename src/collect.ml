@@ -120,17 +120,17 @@ let fun_raise_exception list : bool =
     (List.flatten (List.map Longident.flatten list))
 
 let work_binding (bind : value_binding) =
-  Format.printf "pattern : %a\n" Pprintast.pattern bind.pvb_pat;
-  (*Format.printf "expression : %a\n" Pprintast.expression bind.pvb_expr*)
+  Format.printf "pattern : %a@." Pprintast.pattern bind.pvb_pat;
+  (*Format.printf "expression : %a@." Pprintast.expression bind.pvb_expr*)
   let list_constant = collect_constant bind.pvb_expr in
   List.iter
     (fun c ->
-      Format.printf "constant : %a\n" Pprintast.expression
+      Format.printf "constant : %a@." Pprintast.expression
         (Ast_helper.Exp.constant c))
     list_constant;
   let list_fun_call = collect_fun_calls bind.pvb_expr in
   List.iter
-    (fun f -> Format.printf "fun_call : %a\n" Pprintast.longident f)
+    (fun f -> Format.printf "fun_call : %a@." Pprintast.longident f)
     list_fun_call;
   Format.printf "raise : %b@." (fun_raise_exception list_fun_call)
 
@@ -139,18 +139,7 @@ let work_struct str =
   | Pstr_value (_rec_flag, bindings) ->
       List.iter work_binding bindings (*a modifier *)
   | _ -> ()
-open Lexing
-let work structure =
-  Format.printf "number of structures: %i\n%!" (List.length structure);
-  List.iter work_struct structure
 
-let () =
-  if Array.length Sys.argv <> 2 then failwith "I was expecting a .ml file"
-  else if Filename.extension Sys.argv.(1) <> ".ml" then
-    failwith "I was expecting a .ml file"
-  else
-    let filename = Sys.argv.(1) in
-    (*Format.printf "Parsing file : %s \n" filename;*)
-    let structure = Pparse.parse_implementation ~tool_name:"" filename in
-    (*Format.printf "@.%a\n\n" Pprintast.structure structure;*)
-    work structure
+let work structure =
+  Format.printf "number of structures: %i@." (List.length structure);
+  List.iter work_struct structure

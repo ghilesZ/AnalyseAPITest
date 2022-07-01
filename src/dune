@@ -1,0 +1,16 @@
+(library
+ (public_name collect)
+ (name collect)
+ (modules (:standard \ main))
+ (libraries ocaml-migrate-parsetree)
+)
+
+(executable
+ (public_name main)
+ (name main)
+ (promote (until-clean))
+ (libraries ocaml-migrate-parsetree collect)
+ (flags
+  (:standard -open Collect))
+ (modules main)
+)

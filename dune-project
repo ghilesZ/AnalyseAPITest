@@ -1,4 +1,4 @@
-(lang dune 3.1)
+(lang dune 2.1)
 
 (name collect)
 
