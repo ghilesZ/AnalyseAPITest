@@ -1,7 +1,8 @@
 (library
  (public_name collect)
  (name collect)
- (modules (:standard \ main))
+ (modules Diff Collector)
+ (wrapped false)
  (libraries ocaml-migrate-parsetree)
 )
 
@@ -10,7 +11,5 @@
  (name main)
  (promote (until-clean))
  (libraries ocaml-migrate-parsetree collect)
- (flags
-  (:standard -open Collect))
  (modules main)
 )
