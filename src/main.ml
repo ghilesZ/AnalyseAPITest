@@ -9,4 +9,4 @@ let () =
     (*Format.printf "@.%a\n\n" Pprintast.structure structure;*)
     Collector.work structure
 
-let () = Diff.diff Sys.argv.(1) |> print_endline
+let () = Diff.diff Sys.argv.(1) |> List.iter print_endline

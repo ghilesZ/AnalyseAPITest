@@ -9,18 +9,24 @@ let run ?(opt = []) cmd args =
   let cmdargs = List.fold_left (fun acc a -> acc ^ " " ^ a) cmdopt args in
   exec cmdargs
 
+let lines_from_files filename =
+  let ch_in = open_in filename in
+  let rec lines_from_files_aux i acc =
+    match input_line i with
+    | s -> lines_from_files_aux i (s :: acc)
+    | exception End_of_file -> close_in ch_in ; List.rev acc
+  in
+  lines_from_files_aux ch_in []
+
 (* launches a command with a list of arguments and gets its output *)
 let run_output ?opt cmd args =
   let tmp_file = Filename.temp_file "" ".txt" in
   run ?opt cmd (args @ [ ">" ^ tmp_file ]);
-  let ch = open_in tmp_file in
-  let s = really_input_string ch (in_channel_length ch) in
-  close_in ch;
+  let s = lines_from_files tmp_file in 
   s
 
 (* calls diff on the given filename and gets the output*)
 let diff filename =
-  Format.printf "calling diff on %s@." filename;
   let output_diff =
     run_output
       ("git diff -U0 " ^ filename
@@ -28,4 +34,4 @@ let diff filename =
         \\+\\K[0-9]+(,[0-9]+)?(?= @@)'")
       []
   in
-  output_diff
+  List.tl output_diff
