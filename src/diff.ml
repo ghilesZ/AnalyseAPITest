@@ -9,17 +9,6 @@ let run ?(opt = []) cmd args =
   let cmdargs = List.fold_left (fun acc a -> acc ^ " " ^ a) cmdopt args in
   exec cmdargs
 
-let lines_from_files filename =
-  let ch_in = open_in filename in
-  let rec lines_from_files_aux i acc =
-    match input_line i with
-    | s -> lines_from_files_aux i (s :: acc)
-    | exception End_of_file ->
-        close_in ch_in;
-        List.rev acc
-  in
-  lines_from_files_aux ch_in []
-
 (* launches a command with a list of arguments and gets its output *)
 let run_output ?opt cmd args =
   let ic = run ?opt cmd args in
@@ -30,6 +19,21 @@ let run_output ?opt cmd args =
   in
   List.rev (loop [])
 
+  type t = {
+    filename : string;
+    modifs : (int * int) list;
+  }
+
+let has_change diff =
+  diff.modifs <> []  
+
+(** returns true if theres an intersection between an interval (int * int) and a location *)
+let intersect ((a : int), (b : int)) (loc : Location.t): bool =
+  let open Lexing in 
+  let start_loc = loc.loc_start.pos_lnum in
+  let end_loc = loc.loc_end.pos_lnum in 
+  (a <= start_loc && b<= end_loc) || (a >= start_loc && b >= end_loc) || (a <= start_loc && b >= end_loc) || (a >= start_loc && b <= end_loc)
+
 (* calls diff on the given filename and gets the output*)
 let diff filename =
   let output_diff =
@@ -39,4 +43,17 @@ let diff filename =
         \\+\\K[0-9]+(,[0-9]+)?(?= @@)'")
       []
   in
-  List.tl output_diff
+  let parse str = (match String.split_on_char ',' str with
+    |[a;b] -> ( int_of_string a, int_of_string a + int_of_string b)
+    |[a] -> (int_of_string a, int_of_string a)
+    | _ -> failwith "parse error") in
+
+  let filename = List.hd output_diff in
+  let modifs = List.map parse (List.tl output_diff) in
+   {filename = filename; modifs = modifs}
+  
+
+
+
+
+

@@ -9,4 +9,6 @@ let () =
     (*Format.printf "@.%a\n\n" Pprintast.structure structure;*)
     Collector.work structure
 
-let () = Diff.diff Sys.argv.(1) |> List.iter print_endline
+let () = 
+  let diff = Diff.diff Sys.argv.(1) in
+  Format.printf "diff %b\n" (Diff.has_change diff)
