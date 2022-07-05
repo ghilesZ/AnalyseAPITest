@@ -1,5 +1,13 @@
 open Parsetree
 
+(**returns true if the function has been modified, else false 
+    (if there is an intersection between the location and the files changes)*)
+let differ location =
+  (*doesn't work yet ... returns true only*)
+  let diff = Diff.diff Sys.argv.(1) in
+  let modif_list = diff.modifs in
+  List.mem true (List.map (fun dif -> Diff.intersect dif location) modif_list)
+
 (** Transforms a ('a * expression) list to expression list 
     e.g : [(l1, E1) ; ... ; (ln, En)] en [E1 ; ... ; En]*)
 let list_of_expr list : expression list = List.map snd list
@@ -29,7 +37,8 @@ let collect f expression =
     | Pexp_ifthenelse (condition, branch_then, branch_else) ->
         let list1 = traverse condition in
         let list2 = traverse branch_then in
-        list1 @ list2 @ Option.value (Option.map traverse branch_else) ~default:[]
+        list1 @ list2
+        @ Option.value (Option.map traverse branch_else) ~default:[]
     | Pexp_fun (_, option, _, expression) -> (
         let list1 = traverse expression in
         match option with None -> list1 | Some e -> traverse e @ list1)
@@ -61,18 +70,21 @@ let collect f expression =
     | Pexp_construct (_, exp) ->
         List.flatten (List.map traverse (Option.to_list exp))
     | Pexp_while (condition, body) -> traverse condition @ traverse body
-    | Pexp_function (cases) -> 
+    | Pexp_function cases ->
         let list1 = case_option cases in
         let list2 = case_expression cases in
         List.flatten (List.map traverse list1)
         @ List.flatten (List.map traverse list2)
-    | Pexp_variant (_, option) -> Option.value (Option.map traverse option) ~default:[]
+    | Pexp_variant (_, option) ->
+        Option.value (Option.map traverse option) ~default:[]
     | Pexp_record (tuple_list, option) ->
-        let list1 = (list_of_expr tuple_list) in
-        List.flatten (List.map traverse list1) @ Option.value (Option.map traverse option) ~default:[]
+        let list1 = list_of_expr tuple_list in
+        List.flatten (List.map traverse list1)
+        @ Option.value (Option.map traverse option) ~default:[]
     | Pexp_field (expression, _) -> traverse expression
-    | Pexp_setfield (expression1, _, expression2) -> traverse expression1 @ traverse expression2
-    | Pexp_array (list) -> List.flatten (List.map traverse list)
+    | Pexp_setfield (expression1, _, expression2) ->
+        traverse expression1 @ traverse expression2
+    | Pexp_array list -> List.flatten (List.map traverse list)
     | Pexp_for (_, init, n, _, body) ->
         traverse init @ traverse n @ traverse body
     | Pexp_constraint (expression, _) -> traverse expression
@@ -80,8 +92,8 @@ let collect f expression =
     | Pexp_send (expression, _) -> traverse expression
     | Pexp_new _ -> []
     | Pexp_setinstvar (_, expression) -> traverse expression
-    | Pexp_override (list) -> List.flatten (List.map traverse (list_of_expr list))
-    | Pexp_letmodule (_,_,_)
+    | Pexp_override list -> List.flatten (List.map traverse (list_of_expr list))
+    | Pexp_letmodule (_, _, _)
     | Pexp_letexception (_, _)
     | Pexp_assert _ | Pexp_lazy _
     | Pexp_poly (_, _)
@@ -99,7 +111,7 @@ let collect f expression =
 (* Returns true if raises exception else false*)
 let fun_raise_exception list : bool =
   List.exists
-    (fun lid -> lid = "raise")
+    (fun lid -> List.mem lid [ "raise"; "failwith"; "invalid_arg" ]) (**TODO: add in case of try*)
     (List.flatten (List.map Longident.flatten list))
 
 let work_binding (bind : value_binding) =
@@ -123,12 +135,14 @@ let work_binding (bind : value_binding) =
   List.iter
     (fun f -> Format.printf "fun_call : %a@." Pprintast.longident f)
     list_fun_call;
-  Format.printf "raise : %b@." (fun_raise_exception list_fun_call)
+  Format.printf "raise : %b@." (fun_raise_exception list_fun_call);
+  let location = bind.pvb_loc in
+  let _changed = differ location in
+  Format.printf "diff %b\n" _changed
 
 let work_struct str =
   match str.pstr_desc with
-  | Pstr_value (_rec_flag, bindings) ->
-      List.iter work_binding bindings 
+  | Pstr_value (_rec_flag, bindings) -> List.iter work_binding bindings
   | _ -> ()
 
 let work structure =
