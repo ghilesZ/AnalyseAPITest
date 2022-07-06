@@ -2,14 +2,14 @@ open Parsetree
 
 (**returns true if the function has been modified, else false 
     (if there is an intersection between the location and the files changes)*)
-let differ location =
+let differ (location : Warnings.loc) : bool =
   let diff = Diff.diff Sys.argv.(1) in
   let modif_bool_list =
     List.map (fun dif -> Diff.intersect dif location) diff.modifs
   in
   List.mem true modif_bool_list
 
-let collect_int constant_list =
+let collect_int (constant_list : constant list) : int list =
   List.flatten
     (List.map
        (fun constant ->
@@ -18,14 +18,14 @@ let collect_int constant_list =
          | _ -> [])
        constant_list)
 
-let collect_char constant_list =
+let collect_char (constant_list : constant list) : char list =
   List.flatten
     (List.map
        (fun constant ->
          match constant with Pconst_char character -> [ character ] | _ -> [])
        constant_list)
 
-let collect_string constant_list =
+let collect_string (constant_list : constant list) : string list =
   List.flatten
     (List.map
        (fun constant ->
@@ -34,7 +34,7 @@ let collect_string constant_list =
          | _ -> [])
        constant_list)
 
-let collect_float constant_list =
+let collect_float (constant_list : constant list) : float list =
   List.flatten
     (List.map
        (fun constant ->
@@ -48,7 +48,7 @@ let collect_float constant_list =
 let list_of_expr list : expression list = List.map snd list
 
 (** Transforms case list to expresssion list (the option part)) *)
-let rec case_option list : expression list =
+let rec case_option (list : case list) : expression list =
   match list with
   | [] -> []
   | case :: tail -> (
@@ -57,7 +57,7 @@ let rec case_option list : expression list =
       | Some e -> e :: case_option tail)
 
 (*Transforms case list into expression list*)
-let case_expression list : expression list =
+let case_expression (list : case list) : expression list =
   List.map (fun { pc_rhs; _ } -> pc_rhs) list
 
 (** Goes through the abstract syntaxt tree and calls the function f that decides 
@@ -128,15 +128,18 @@ let collect f expression =
     | Pexp_new _ -> []
     | Pexp_setinstvar (_, expression) -> traverse expression
     | Pexp_override list -> List.flatten (List.map traverse (list_of_expr list))
-    | Pexp_letmodule (_, _, _)
-    | Pexp_letexception (_, _)
-    | Pexp_assert _ | Pexp_lazy _
-    | Pexp_poly (_, _)
-    | Pexp_object _
-    | Pexp_newtype (_, _)
-    | Pexp_pack _
-    | Pexp_open (_, _)
-    | Pexp_letop _ | Pexp_extension _ | Pexp_unreachable ->
+    | Pexp_letmodule (_, _, module_body) -> traverse module_body (*à revoir*)
+    | Pexp_letexception (_, body) -> traverse body
+    | Pexp_assert assert_expr -> traverse assert_expr
+    | Pexp_lazy lazy_expr -> traverse lazy_expr
+    | Pexp_poly (poly_expr, _) -> traverse poly_expr
+    | Pexp_object _ -> []
+    | Pexp_newtype (_, new_expr) -> traverse new_expr
+    | Pexp_pack _ -> [] (*à revoir*)
+    | Pexp_open (_, open_expr) -> traverse open_expr (*à revoir*)
+    | Pexp_letop letop_expr -> traverse letop_expr.body
+    | Pexp_extension _ -> [] (*à revoir*)
+    | Pexp_unreachable ->
         Format.printf "%a: pas encore implémenté - on saute"
           Pprintast.expression expression;
         []
@@ -144,7 +147,7 @@ let collect f expression =
   traverse expression
 
 (* Returns true if raises exception else false*)
-let fun_raise_exception list : bool =
+let fun_raise_exception (list : Longident.t list) : bool =
   (*TODO: add in case of try*)
   List.exists
     (fun lid -> List.mem lid [ "raise"; "failwith"; "invalid_arg" ])

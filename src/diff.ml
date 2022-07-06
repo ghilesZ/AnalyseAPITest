@@ -19,23 +19,22 @@ let run_output ?opt cmd args =
   in
   List.rev (loop [])
 
-  type t = {
-    filename : string;
-    modifs : (int * int) list;
-  }
+type t = { filename : string; modifs : (int * int) list }
 
-let has_change diff =
-  diff.modifs <> []  
+let has_change (diff : t) : bool = diff.modifs <> []
 
 (** returns true if theres an intersection between an interval (int * int) and a location *)
-let intersect ((a : int), (b : int)) (loc : Location.t): bool =
-  let open Lexing in 
+let intersect ((a : int), (b : int)) (loc : Location.t) : bool =
+  let open Lexing in
   let start_loc = loc.loc_start.pos_lnum in
-  let end_loc = loc.loc_end.pos_lnum in 
-  (a <= start_loc && b>= start_loc) || (a <= end_loc && b >= end_loc) || (a <= start_loc && b >= end_loc) || (a >= start_loc && b <= end_loc)
+  let end_loc = loc.loc_end.pos_lnum in
+  (a <= start_loc && b >= start_loc)
+  || (a <= end_loc && b >= end_loc)
+  || (a <= start_loc && b >= end_loc)
+  || (a >= start_loc && b <= end_loc)
 
 (* calls diff on the given filename and gets the output*)
-let diff filename =
+let diff (filename : string) : t =
   let output_diff =
     run_output
       ("git diff -U0 " ^ filename
@@ -43,17 +42,13 @@ let diff filename =
         \\+\\K[0-9]+(,[0-9]+)?(?= @@)'")
       []
   in
-  let parse str = (match String.split_on_char ',' str with
-    |[a;b] -> ( int_of_string a, int_of_string a + int_of_string b)
-    |[a] -> (int_of_string a, int_of_string a)
-    | _ -> failwith "parse error") in
+  let parse str =
+    match String.split_on_char ',' str with
+    | [ a; b ] -> (int_of_string a, int_of_string a + int_of_string b)
+    | [ a ] -> (int_of_string a, int_of_string a)
+    | _ -> failwith "parse error"
+  in
 
   let filename = List.hd output_diff in
   let modifs = List.map parse (List.tl output_diff) in
-   {filename = filename; modifs = modifs}
-  
-
-
-
-
-
+  { filename; modifs }
