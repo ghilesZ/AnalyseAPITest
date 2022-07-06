@@ -6,6 +6,19 @@
  (libraries ocaml-migrate-parsetree unix)
 )
 
+(library
+  (name ppx_info)
+  (wrapped false)
+  (kind ppx_rewriter)
+  (modules Ppx_info)
+  (libraries collect ocaml-migrate-parsetree)
+)
+
+(executable
+  (name rewriter)
+  (modules Rewriter)
+  (libraries ppx_info ppxlib))
+
 (executable
  (public_name main)
  (name main)
