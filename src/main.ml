@@ -11,4 +11,4 @@ let () =
 
 let () = 
   let diff = Diff.diff Sys.argv.(1) in
-  Format.printf "diff %b\n" (Diff.has_change diff)
+  Format.printf "This file has changed : %b\n" (Diff.has_change diff)

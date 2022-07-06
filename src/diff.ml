@@ -32,7 +32,7 @@ let intersect ((a : int), (b : int)) (loc : Location.t): bool =
   let open Lexing in 
   let start_loc = loc.loc_start.pos_lnum in
   let end_loc = loc.loc_end.pos_lnum in 
-  (a <= start_loc && b<= end_loc) || (a >= start_loc && b >= end_loc) || (a <= start_loc && b >= end_loc) || (a >= start_loc && b <= end_loc)
+  (a <= start_loc && b>= start_loc) || (a <= end_loc && b >= end_loc) || (a <= start_loc && b >= end_loc) || (a >= start_loc && b <= end_loc)
 
 (* calls diff on the given filename and gets the output*)
 let diff filename =

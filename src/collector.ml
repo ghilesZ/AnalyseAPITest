@@ -3,10 +3,45 @@ open Parsetree
 (**returns true if the function has been modified, else false 
     (if there is an intersection between the location and the files changes)*)
 let differ location =
-  (*doesn't work yet ... returns true only*)
   let diff = Diff.diff Sys.argv.(1) in
-  let modif_list = diff.modifs in
-  List.mem true (List.map (fun dif -> Diff.intersect dif location) modif_list)
+  let modif_bool_list =
+    List.map (fun dif -> Diff.intersect dif location) diff.modifs
+  in
+  List.mem true modif_bool_list
+
+let collect_int constant_list =
+  List.flatten
+    (List.map
+       (fun constant ->
+         match constant with
+         | Pconst_integer (prefixe, _) -> [ int_of_string prefixe ]
+         | _ -> [])
+       constant_list)
+
+let collect_char constant_list =
+  List.flatten
+    (List.map
+       (fun constant ->
+         match constant with Pconst_char character -> [ character ] | _ -> [])
+       constant_list)
+
+let collect_string constant_list =
+  List.flatten
+    (List.map
+       (fun constant ->
+         match constant with
+         | Pconst_string (prefixe, _, _) -> [ prefixe ]
+         | _ -> [])
+       constant_list)
+
+let collect_float constant_list =
+  List.flatten
+    (List.map
+       (fun constant ->
+         match constant with
+         | Pconst_float (prefixe, _) -> [ float_of_string prefixe ]
+         | _ -> [])
+       constant_list)
 
 (** Transforms a ('a * expression) list to expression list 
     e.g : [(l1, E1) ; ... ; (ln, En)] en [E1 ; ... ; En]*)
@@ -110,8 +145,9 @@ let collect f expression =
 
 (* Returns true if raises exception else false*)
 let fun_raise_exception list : bool =
+  (*TODO: add in case of try*)
   List.exists
-    (fun lid -> List.mem lid [ "raise"; "failwith"; "invalid_arg" ]) (**TODO: add in case of try*)
+    (fun lid -> List.mem lid [ "raise"; "failwith"; "invalid_arg" ])
     (List.flatten (List.map Longident.flatten list))
 
 let work_binding (bind : value_binding) =
@@ -137,8 +173,8 @@ let work_binding (bind : value_binding) =
     list_fun_call;
   Format.printf "raise : %b@." (fun_raise_exception list_fun_call);
   let location = bind.pvb_loc in
-  let _changed = differ location in
-  Format.printf "diff %b\n" _changed
+  let changed = differ location in
+  Format.printf "diff %b\n" changed
 
 let work_struct str =
   match str.pstr_desc with
