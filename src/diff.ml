@@ -48,7 +48,8 @@ let diff (filename : string) : t =
     | [ a ] -> (int_of_string a, int_of_string a)
     | _ -> failwith "parse error"
   in
-
-  let filename = List.hd output_diff in
-  let modifs = List.map parse (List.tl output_diff) in
-  { filename; modifs }
+  match output_diff with
+  | [] -> { filename; modifs = [] }
+  | output_diff ->
+      let modifs = List.map parse (List.tl output_diff) in
+      { filename; modifs }

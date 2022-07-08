@@ -7,7 +7,8 @@ let () =
     (*Format.printf "Parsing file : %s \n" filename;*)
     let structure = Pparse.parse_implementation ~tool_name:"" filename in
     (*Format.printf "@.%a\n\n" Pprintast.structure structure;*)
-    Collector.work structure
+    let result = Collector.work filename structure in
+    Format.printf "%a@." Collector.pp_collection_result result
 
 let () = 
   let diff = Diff.diff Sys.argv.(1) in

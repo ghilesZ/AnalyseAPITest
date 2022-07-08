@@ -1,6 +1,79 @@
 open Parsetree
+module StringSet = Set.Make (String)
 
-(**returns true if the function has been modified, else false 
+type declaration_result = {
+  declaration_name : string;
+  declaration_size : int;
+  collected_fun_calls : StringSet.t;
+  collected_constants_integer : StringSet.t;
+  collected_constants_char : StringSet.t;
+  collected_constants_string : StringSet.t;
+  collected_constants_float : StringSet.t;
+  potential_exception : bool;
+  declaration_changed : bool;
+}
+
+module ComparableDeclarationResult = struct
+  type t = declaration_result
+
+  let compare (e : declaration_result) (e' : declaration_result) : int =
+    String.compare e.declaration_name e'.declaration_name
+end
+
+module DeclarationSet = Set.Make (ComparableDeclarationResult)
+
+type collection_result = {
+  filename : string;
+  collection_results : DeclarationSet.t;
+}
+
+let pp_collection_results fmt
+    {
+      declaration_name;
+      declaration_size;
+      collected_fun_calls;
+      collected_constants_integer;
+      collected_constants_char;
+      collected_constants_string;
+      collected_constants_float;
+      potential_exception;
+      declaration_changed;
+    } =
+  let open Format in
+  let pp_string_set fmt set =
+    let l = StringSet.elements set in
+    if l = [] then fprintf fmt "∅"
+    else
+      fprintf fmt "{@[<h>%a@]}"
+        (pp_print_list
+           ~pp_sep:(fun fmt () -> fprintf fmt ", ")
+           (fun fmt s -> fprintf fmt "'%s'" s))
+        l
+  in
+  fprintf fmt
+    "@[<v 2>Name: '%s'@ Structure size: %d@ Function calls: %a@ Integers: %a@ \
+     Characters: %a@ Strings: %a@ Floats: %a@ Potential exception: %b@ \
+     Declaration changed: %b@]"
+    declaration_name declaration_size pp_string_set collected_fun_calls
+    pp_string_set collected_constants_integer pp_string_set
+    collected_constants_char pp_string_set collected_constants_string
+    pp_string_set collected_constants_float potential_exception
+    declaration_changed
+
+let pp_collection_result fmt { filename; collection_results } =
+  let open Format in
+  fprintf fmt "@[<v 2>Result for '%s'@ %a@]" filename
+    (pp_print_list pp_collection_results)
+    (DeclarationSet.elements collection_results)
+
+(**returns the lexical length of a structure using its location*)
+let length_lex (loc : Location.t) : int =
+  let open Lexing in
+  let start_loc = loc.loc_start.pos_lnum in
+  let end_loc = loc.loc_end.pos_lnum in
+  end_loc - start_loc + 1
+
+(**returns true if the function has been modified, else false
     (if there is an intersection between the location and the files changes)*)
 let differ (location : Warnings.loc) : bool =
   let diff = Diff.diff Sys.argv.(1) in
@@ -9,20 +82,26 @@ let differ (location : Warnings.loc) : bool =
   in
   List.mem true modif_bool_list
 
-let collect_int (constant_list : constant list) : int list =
+let collect_int (constant_list : constant list) : string list =
   List.flatten
     (List.map
        (fun constant ->
          match constant with
-         | Pconst_integer (prefixe, _) -> [ int_of_string prefixe ]
+         | Pconst_integer (prefixe, char_op) ->
+             [
+               (prefixe
+               ^ match char_op with Some c -> String.make 1 c | None -> "");
+             ]
          | _ -> [])
        constant_list)
 
-let collect_char (constant_list : constant list) : char list =
+let collect_char (constant_list : constant list) : string list =
   List.flatten
     (List.map
        (fun constant ->
-         match constant with Pconst_char character -> [ character ] | _ -> [])
+         match constant with
+         | Pconst_char character -> [ String.make 1 character ]
+         | _ -> [])
        constant_list)
 
 let collect_string (constant_list : constant list) : string list =
@@ -34,12 +113,16 @@ let collect_string (constant_list : constant list) : string list =
          | _ -> [])
        constant_list)
 
-let collect_float (constant_list : constant list) : float list =
+let collect_float (constant_list : constant list) : string list =
   List.flatten
     (List.map
        (fun constant ->
          match constant with
-         | Pconst_float (prefixe, _) -> [ float_of_string prefixe ]
+         | Pconst_float (prefixe, char_op) ->
+             [
+               (prefixe
+               ^ match char_op with Some c -> String.make 1 c | None -> "");
+             ]
          | _ -> [])
        constant_list)
 
@@ -128,17 +211,22 @@ let collect f expression =
     | Pexp_new _ -> []
     | Pexp_setinstvar (_, expression) -> traverse expression
     | Pexp_override list -> List.flatten (List.map traverse (list_of_expr list))
-    | Pexp_letmodule (_, _, module_body) -> traverse module_body (*à revoir*)
+    | Pexp_letmodule (_, mod_expr, module_body) ->
+        let desc = mod_expr.pmod_desc in
+        (match desc with Pmod_unpack expr -> traverse expr | _ -> [])
+        @ traverse module_body
     | Pexp_letexception (_, body) -> traverse body
     | Pexp_assert assert_expr -> traverse assert_expr
     | Pexp_lazy lazy_expr -> traverse lazy_expr
     | Pexp_poly (poly_expr, _) -> traverse poly_expr
     | Pexp_object _ -> []
     | Pexp_newtype (_, new_expr) -> traverse new_expr
-    | Pexp_pack _ -> [] (*à revoir*)
-    | Pexp_open (_, open_expr) -> traverse open_expr (*à revoir*)
+    | Pexp_pack mod_expr -> (
+        let desc = mod_expr.pmod_desc in
+        match desc with Pmod_unpack expr -> traverse expr | _ -> [])
+    | Pexp_open (_open_dec, open_expr) -> traverse open_expr
     | Pexp_letop letop_expr -> traverse letop_expr.body
-    | Pexp_extension _ -> [] (*à revoir*)
+    | Pexp_extension _ -> []
     | Pexp_unreachable ->
         Format.printf "%a: pas encore implémenté - on saute"
           Pprintast.expression expression;
@@ -148,10 +236,12 @@ let collect f expression =
 
 (* Returns true if raises exception else false*)
 let fun_raise_exception (list : Longident.t list) : bool =
-  (*TODO: add in case of try*)
   List.exists
     (fun lid -> List.mem lid [ "raise"; "failwith"; "invalid_arg" ])
     (List.flatten (List.map Longident.flatten list))
+
+let _fun_catch_exception (expression : expression) : bool =
+  match expression.pexp_desc with Pexp_let (_, _, _) -> true | _ -> false
 
 let work_binding (bind : value_binding) =
   Format.printf "pattern : %a@." Pprintast.pattern bind.pvb_pat;
@@ -175,15 +265,77 @@ let work_binding (bind : value_binding) =
     (fun f -> Format.printf "fun_call : %a@." Pprintast.longident f)
     list_fun_call;
   Format.printf "raise : %b@." (fun_raise_exception list_fun_call);
+  (*Format.printf "catch : %b@." (fun_catch_exception bind.pvb_expr);*)
   let location = bind.pvb_loc in
   let changed = differ location in
-  Format.printf "diff %b\n" changed
+  Format.printf "diff : %b @." changed;
+  Format.printf "taille : %d @." (length_lex location)
+
+let work_record (bind : value_binding) =
+  let collect_fun_calls = function
+    | Pexp_apply ({ pexp_desc = Pexp_ident lid; _ }, _) -> [ lid.txt ]
+    | _ -> []
+  in
+  let list_fun_call = collect collect_fun_calls bind.pvb_expr in
+
+  let collect_constant = function
+    | Pexp_constant constant -> [ constant ]
+    | _ -> []
+  in
+  let list_constant = collect collect_constant bind.pvb_expr in
+
+  let collected_fun_calls =
+    StringSet.of_list (List.flatten (List.map Longident.flatten list_fun_call))
+  in
+
+  let collected_constants_integer =
+    StringSet.of_list (collect_int list_constant)
+  in
+
+  let collected_constants_char =
+    StringSet.of_list (collect_char list_constant)
+  in
+
+  let collected_constants_string =
+    StringSet.of_list (collect_string list_constant)
+  in
+
+  let collected_constants_float =
+    StringSet.of_list (collect_float list_constant)
+  in
+  let declaration_name = Format.asprintf "%a" Pprintast.pattern bind.pvb_pat in
+  {
+    declaration_name;
+    declaration_size = length_lex bind.pvb_loc;
+    collected_fun_calls;
+    collected_constants_integer;
+    collected_constants_char;
+    collected_constants_string;
+    collected_constants_float;
+    potential_exception = fun_raise_exception list_fun_call;
+    declaration_changed = differ bind.pvb_loc;
+  }
+
+(*declaration_name : string;
+  declaration_size : int;
+  collected_fun_calls : StringSet.t;
+  collected_constants_integer : StringSet.t;
+  collected_constants_char : StringSet.t;
+  collected_constants_string : StringSet.t;
+  collected_constants_float : StringSet.t;
+  potential_exception : bool;
+  declaration_changed : bool; *)
 
 let work_struct str =
   match str.pstr_desc with
-  | Pstr_value (_rec_flag, bindings) -> List.iter work_binding bindings
-  | _ -> ()
+  | Pstr_value (_rec_flag, bindings) -> Some (List.map work_record bindings)
+  | _ -> None
 
-let work structure =
-  Format.printf "number of structures: %i@." (List.length structure);
-  List.iter work_struct structure
+(*: collection_result*)
+let work filename (structure : Parsetree.structure_item list) :
+    collection_result =
+  let collection_results =
+    DeclarationSet.of_list
+      (List.flatten (List.filter_map work_struct structure))
+  in
+  { filename; collection_results }
