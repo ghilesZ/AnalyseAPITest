@@ -245,7 +245,6 @@ let _fun_catch_exception (expression : expression) : bool =
 
 let work_binding (bind : value_binding) =
   Format.printf "pattern : %a@." Pprintast.pattern bind.pvb_pat;
-  (*Format.printf "expression : %a@." Pprintast.expression bind.pvb_expr*)
   let collect_constant = function
     | Pexp_constant constant -> [ constant ]
     | _ -> []
@@ -316,22 +315,13 @@ let work_record (bind : value_binding) =
     declaration_changed = differ bind.pvb_loc;
   }
 
-(*declaration_name : string;
-  declaration_size : int;
-  collected_fun_calls : StringSet.t;
-  collected_constants_integer : StringSet.t;
-  collected_constants_char : StringSet.t;
-  collected_constants_string : StringSet.t;
-  collected_constants_float : StringSet.t;
-  potential_exception : bool;
-  declaration_changed : bool; *)
 
 let work_struct str =
   match str.pstr_desc with
   | Pstr_value (_rec_flag, bindings) -> Some (List.map work_record bindings)
   | _ -> None
 
-(*: collection_result*)
+
 let work filename (structure : Parsetree.structure_item list) :
     collection_result =
   let collection_results =
