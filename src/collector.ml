@@ -1,5 +1,15 @@
+open Migrate_parsetree
+open Ast_410
 open Parsetree
 module StringSet = Set.Make (String)
+module Conv = Convert (OCaml_410) (OCaml_current)
+module DeConv = Convert (OCaml_current) (OCaml_410)
+
+let print_expression fmt e =
+  Format.fprintf fmt "%a%!" Pprintast.expression (Conv.copy_expression e)
+
+let print_pat fmt p =
+  Format.fprintf fmt "%a%!" Pprintast.pattern (Conv.copy_pattern p)
 
 type declaration_result = {
   declaration_name : string;
@@ -111,7 +121,7 @@ let collect_string (constant_list : constant list) : string list =
     (List.map
        (fun constant ->
          match constant with
-         | Pconst_string (prefixe, _, _) -> [ prefixe ]
+         | Pconst_string (prefixe, _) -> [ prefixe ]
          | _ -> [])
        constant_list)
 
@@ -128,7 +138,7 @@ let collect_float (constant_list : constant list) : string list =
          | _ -> [])
        constant_list)
 
-(** Transforms a ('a * expression) list to expression list 
+(** Transforms a ('a * expression) list to expression list
     e.g : [(l1, E1) ; ... ; (ln, En)] en [E1 ; ... ; En]*)
 let list_of_expr list : expression list = List.map snd list
 
@@ -145,7 +155,7 @@ let rec case_option (list : case list) : expression list =
 let case_expression (list : case list) : expression list =
   List.map (fun { pc_rhs; _ } -> pc_rhs) list
 
-(** Goes through the abstract syntaxt tree and calls the function f that decides 
+(** Goes through the abstract syntaxt tree and calls the function f that decides
     whether to put what it collected in a list or not, depending on the needs*)
 let collect f expression =
   let rec traverse expression =
@@ -230,8 +240,8 @@ let collect f expression =
     | Pexp_letop letop_expr -> traverse letop_expr.body
     | Pexp_extension _ -> []
     | Pexp_unreachable ->
-        Format.printf "%a: pas encore implémenté - on saute"
-          Pprintast.expression expression;
+        Format.printf "%a pas encore implémenté - on saute" print_expression
+          expression;
         []
   in
   traverse expression
@@ -244,33 +254,6 @@ let fun_raise_exception (list : Longident.t list) : bool =
 
 let fun_catch_exception (expression : expression) : bool =
   match expression.pexp_desc with Pexp_try (_, _) -> true | _ -> false
-
-let work_binding (bind : value_binding) =
-  Format.printf "pattern : %a@." Pprintast.pattern bind.pvb_pat;
-  let collect_constant = function
-    | Pexp_constant constant -> [ constant ]
-    | _ -> []
-  in
-  let list_constant = collect collect_constant bind.pvb_expr in
-  List.iter
-    (fun c ->
-      Format.printf "constant : %a@." Pprintast.expression
-        (Ast_helper.Exp.constant c))
-    list_constant;
-  let collect_fun_calls = function
-    | Pexp_apply ({ pexp_desc = Pexp_ident lid; _ }, _) -> [ lid.txt ]
-    | _ -> []
-  in
-  let list_fun_call = collect collect_fun_calls bind.pvb_expr in
-  List.iter
-    (fun f -> Format.printf "fun_call : %a@." Pprintast.longident f)
-    list_fun_call;
-  Format.printf "raise : %b@." (fun_raise_exception list_fun_call);
-  Format.printf "catch : %b@." (fun_catch_exception bind.pvb_expr);
-  let location = bind.pvb_loc in
-  let changed = differ location in
-  Format.printf "diff : %b @." changed;
-  Format.printf "taille : %d @." (length_lex location)
 
 let work_record (bind : value_binding) : declaration_result =
   let collect_fun_calls = function
@@ -304,7 +287,7 @@ let work_record (bind : value_binding) : declaration_result =
   let collected_constants_float =
     StringSet.of_list (collect_float list_constant)
   in
-  let declaration_name = Format.asprintf "%a" Pprintast.pattern bind.pvb_pat in
+  let declaration_name = Format.asprintf "%a" print_pat bind.pvb_pat in
   {
     declaration_name;
     declaration_size = length_lex bind.pvb_loc;
