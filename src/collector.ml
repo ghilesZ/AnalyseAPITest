@@ -10,6 +10,7 @@ type declaration_result = {
   collected_constants_string : StringSet.t;
   collected_constants_float : StringSet.t;
   potential_exception : bool;
+  potential_catch_exception : bool;
   declaration_changed : bool;
 }
 
@@ -37,6 +38,7 @@ let pp_collection_results fmt
       collected_constants_string;
       collected_constants_float;
       potential_exception;
+      potential_catch_exception;
       declaration_changed;
     } =
   let open Format in
@@ -53,12 +55,12 @@ let pp_collection_results fmt
   fprintf fmt
     "@[<v 2>Name: '%s'@ Structure size: %d@ Function calls: %a@ Integers: %a@ \
      Characters: %a@ Strings: %a@ Floats: %a@ Potential exception: %b@ \
-     Declaration changed: %b@]"
+     Potential catch exception: %b@ Declaration changed: %b@]"
     declaration_name declaration_size pp_string_set collected_fun_calls
     pp_string_set collected_constants_integer pp_string_set
     collected_constants_char pp_string_set collected_constants_string
     pp_string_set collected_constants_float potential_exception
-    declaration_changed
+    potential_catch_exception declaration_changed
 
 let pp_collection_result fmt { filename; collection_results } =
   let open Format in
@@ -240,8 +242,8 @@ let fun_raise_exception (list : Longident.t list) : bool =
     (fun lid -> List.mem lid [ "raise"; "failwith"; "invalid_arg" ])
     (List.flatten (List.map Longident.flatten list))
 
-let _fun_catch_exception (expression : expression) : bool =
-  match expression.pexp_desc with Pexp_let (_, _, _) -> true | _ -> false
+let fun_catch_exception (expression : expression) : bool =
+  match expression.pexp_desc with Pexp_try (_, _) -> true | _ -> false
 
 let work_binding (bind : value_binding) =
   Format.printf "pattern : %a@." Pprintast.pattern bind.pvb_pat;
@@ -264,13 +266,13 @@ let work_binding (bind : value_binding) =
     (fun f -> Format.printf "fun_call : %a@." Pprintast.longident f)
     list_fun_call;
   Format.printf "raise : %b@." (fun_raise_exception list_fun_call);
-  (*Format.printf "catch : %b@." (fun_catch_exception bind.pvb_expr);*)
+  Format.printf "catch : %b@." (fun_catch_exception bind.pvb_expr);
   let location = bind.pvb_loc in
   let changed = differ location in
   Format.printf "diff : %b @." changed;
   Format.printf "taille : %d @." (length_lex location)
 
-let work_record (bind : value_binding) =
+let work_record (bind : value_binding) : declaration_result =
   let collect_fun_calls = function
     | Pexp_apply ({ pexp_desc = Pexp_ident lid; _ }, _) -> [ lid.txt ]
     | _ -> []
@@ -312,15 +314,14 @@ let work_record (bind : value_binding) =
     collected_constants_string;
     collected_constants_float;
     potential_exception = fun_raise_exception list_fun_call;
+    potential_catch_exception = fun_catch_exception bind.pvb_expr;
     declaration_changed = differ bind.pvb_loc;
   }
 
-
-let work_struct str =
+let work_struct (str : structure_item) =
   match str.pstr_desc with
   | Pstr_value (_rec_flag, bindings) -> Some (List.map work_record bindings)
   | _ -> None
-
 
 let work filename (structure : Parsetree.structure_item list) :
     collection_result =
